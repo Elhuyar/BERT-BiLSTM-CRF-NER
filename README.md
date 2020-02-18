@@ -27,7 +27,7 @@ cd BERT-BiLSTM-CRF-NER/
 python3 setup.py install
 ```
 
-if you do not want to install, you just need clone this project and reference the file of <run.py> to train the model or start the service. 
+if you do not want to install, you just need to clone this project and call <run.py> to train the model or start the service. 
 
 ## Train model:
 You can use -help to view the relevant parameters of the training named entity recognition model, where data_dir, bert_config_file, output_dir, init_checkpoint, vocab_file must be specified.
