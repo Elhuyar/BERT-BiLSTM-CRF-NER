@@ -10,10 +10,9 @@ from zmq.utils import jsonapi
 __all__ = ['set_logger', 'send_ndarray', 'get_args_parser',
            'check_tf_version', 'auto_bind', 'import_tf']
 
-
 def set_logger(context, verbose=False):
-    #if os.name == 'nt':  # for Windows
-    #    return NTLogger(context, verbose)
+    if os.name == 'nt':  # for Windows
+        return NTLogger(context, verbose)
 
     logger = logging.getLogger(context)
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
@@ -99,8 +98,6 @@ def get_args_parser():
                         help='masking the embedding on [CLS] and [SEP] with zero. \
                         When pooling_strategy is in {CLS_TOKEN, FIRST_TOKEN, SEP_TOKEN, LAST_TOKEN} \
                         then the embedding is preserved, otherwise the embedding is masked to zero before pooling')
-    group2.add_argument('-lstm_size', type=int, default=128,
-                        help='size of lstm units.')
 
     group3 = parser.add_argument_group('Serving Configs',
                                        'config how server utilizes GPU/CPU resources')

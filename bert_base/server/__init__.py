@@ -336,7 +336,8 @@ class BertSink(Process):
                 elif self.args.mode == 'NER':
                     arr_info, arr_val = jsonapi.loads(msg[1]), pickle.loads(msg[2])
                     pending_result[job_id].append((arr_val, partial_id))
-                    pending_checksum[job_id] += len(arr_val)
+                    #pending_checksum[job_id] += len(arr_val)
+                    pending_checksum[job_id] += len(arr_val['pred_label'])
                 elif self.args.mode == 'CLASS':
                     arr_info, arr_val = jsonapi.loads(msg[1]), pickle.loads(msg[2])
                     pending_result[job_id].append((arr_val, partial_id))
@@ -353,7 +354,7 @@ class BertSink(Process):
                     # re-sort to the original order
                     tmp = [x[0] for x in sorted(tmp, key=lambda x: int(x[1]))]
                     client_addr, req_id = job_info.split(b'#')
-                    if self.args.mode == 'CLASS': # 因为分类模型带上了分类的概率，所以不能直接返回结果，需要使用json格式的数据进行返回。
+                    if self.args.mode == 'CLASS' or self.args.mode == 'NER' : # 因为分类模型带上了分类的概率，所以不能直接返回结果，需要使用json格式的数据进行返回。
                         send_ndarray(sender, client_addr, tmp, req_id)
                     else:
                         send_ndarray(sender, client_addr, np.concatenate(tmp, axis=0), req_id)
@@ -442,7 +443,8 @@ class BertWorker(Process):
 
             return EstimatorSpec(mode=mode, predictions={
                 'client_id': features['client_id'],
-                'encodes': pred_ids[0]
+                'encodes': pred_ids[0],
+                'tokens': features['tokens']
             })
 
         def classification_model_fn(features, labels, mode, params):
@@ -459,10 +461,7 @@ class BertWorker(Process):
                 graph_def.ParseFromString(f.read())
             input_ids = features["input_ids"]
             input_mask = features["input_mask"]
-            #为了兼容多输入，增加segment_id特征，即训练代码中的input_type_ids特征。
-            #input_map = {"input_ids": input_ids, "input_mask": input_mask}
-            segment_ids=features["input_type_ids"]
-            input_map = {"input_ids": input_ids, "input_mask": input_mask,"segment_ids":segment_ids}            
+            input_map = {"input_ids": input_ids, "input_mask": input_mask}
             pred_probs = tf.import_graph_def(graph_def, name='', input_map=input_map, return_elements=['pred_prob:0'])
 
             return EstimatorSpec(mode=mode, predictions={
@@ -511,13 +510,15 @@ class BertWorker(Process):
                 logger.info('job done\tsize: %s\tclient: %s' % (r['encodes'].shape, r['client_id']))
             elif self.mode == 'NER':
                 pred_label_result, pred_ids_result = ner_result_to_json(r['encodes'], self.id2label)
-                rst = send_ndarray(sink, r['client_id'], pred_label_result)
+                to_client = {'pred_label': pred_label_result, 'tokens':r['tokens']}
+                rst = send_ndarray(sink, r['client_id'], to_client)
                 # print('rst:', rst)
+                #logger.info("tokens ({}): {} \n pred labels ({}): {} \n ".format(len(r['tokens'][0]), r['tokens'], len(pred_label_result[0]), pred_label_result))
                 logger.info('job done\tsize: %s\tclient: %s' % (r['encodes'].shape, r['client_id']))
             elif self.mode == 'CLASS':
                 pred_label_result = [self.id2label.get(x, -1) for x in r['encodes']]
                 pred_score_result = r['score'].tolist()
-                to_client = {'pred_label': pred_label_result, 'score': pred_score_result}
+                to_client = {'pred_label': pred_label_result, 'score': pred_score_result,'tokens':r['tokens']}
                 rst = send_ndarray(sink, r['client_id'], to_client)
                 logger.info('job done\tsize: %s\tclient: %s' % (r['encodes'].shape, r['client_id']))
 
@@ -548,16 +549,18 @@ class BertWorker(Process):
                         logger.info('new job\tsocket: %d\tsize: %d\tclient: %s' % (sock_idx, len(msg), client_id))
                         # check if msg is a list of list, if yes consider the input is already tokenized
                         # 对接收到的字符进行切词，并且转化为id格式
-                        # logger.info('get msg:%s, type:%s' % (msg[0], type(msg[0])))
+                        logger.info('get msg:%s, type:%s' % (msg[0], type(msg[0])))
                         is_tokenized = all(isinstance(el, list) for el in msg)
                         tmp_f = list(convert_lst_to_features(msg, self.max_seq_len, tokenizer, logger,
                                                              is_tokenized, self.mask_cls_sep))
                         #print([f.input_ids for f in tmp_f])
+                        logger.info([f.tokens for f in tmp_f])
                         yield {
                             'client_id': client_id,
                             'input_ids': [f.input_ids for f in tmp_f],
                             'input_mask': [f.input_mask for f in tmp_f],
-                            'input_type_ids': [f.input_type_ids for f in tmp_f]
+                            'input_type_ids': [f.input_type_ids for f in tmp_f],
+                            'tokens':[f.tokens for f in tmp_f]
                         }
 
         def input_fn():
@@ -566,12 +569,16 @@ class BertWorker(Process):
                 output_types={'input_ids': tf.int32,
                               'input_mask': tf.int32,
                               'input_type_ids': tf.int32,
-                              'client_id': tf.string},
+                              'client_id': tf.string,
+                              'tokens': tf.string,},
                 output_shapes={
                     'client_id': (),
                     'input_ids': (None, self.max_seq_len),
                     'input_mask': (None, self.max_seq_len), #.shard(num_shards=4, index=4)
-                    'input_type_ids': (None, self.max_seq_len)}).prefetch(self.prefetch_size))
+                    'input_type_ids': (None, self.max_seq_len),
+                    'tokens': (None,None),
+                }).prefetch(self.prefetch_size))
+
 
         return input_fn
 

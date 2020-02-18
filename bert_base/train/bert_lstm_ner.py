@@ -27,7 +27,7 @@ from bert_base.bert import tokenization
 # import
 
 from bert_base.train.models import create_model, InputFeatures, InputExample
-from bert_base.server.helper import set_logger
+
 __version__ = '0.1.0'
 
 __all__ = ['__version__', 'DataProcessor', 'NerProcessor', 'write_tokens', 'convert_single_example',
@@ -35,7 +35,6 @@ __all__ = ['__version__', 'DataProcessor', 'NerProcessor', 'write_tokens', 'conv
            'model_fn_builder', 'train']
 
 
-logger = set_logger('NER Training')
 
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""
@@ -118,11 +117,11 @@ class NerProcessor(DataProcessor):
                 self.labels = pickle.load(rf)
         else:
             if len(self.labels) > 0:
-                self.labels = self.labels.union(set(["X", "[CLS]", "[SEP]"]))
+                self.labels = self.labels.union(set(["[PAD]","X", "[CLS]", "[SEP]"]))
                 with codecs.open(os.path.join(self.output_dir, 'label_list.pkl'), 'wb') as rf:
                     pickle.dump(self.labels, rf)
             else:
-                self.labels = ["O", 'B-TIM', 'I-TIM', "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]"]
+                self.labels = ["O", 'B-TIM', 'I-TIM', "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]","[PAD]"]
         return self.labels
 
     def _create_example(self, lines, set_type):
@@ -166,10 +165,29 @@ class NerProcessor(DataProcessor):
             return lines
 
 
+    def _read_data2(self,input_file):
+        """Read a BIO data!"""
+        rf = open(input_file,'r')
+        lines = [];words = [];labels = []
+        for line in rf:
+            word = line.strip().split(' ')[0]
+            label = line.strip().split(' ')[-1]
+            # here we dont do "DOCSTART" check 
+            if len(line.strip())==0 : #and (words[-1] == '.' or words[-1] == ';'):
+                l = ' '.join([label for label in labels if len(label) > 0])
+                w = ' '.join([word for word in words if len(word) > 0])
+                lines.append((l,w))
+                words=[]
+                labels = []
+            words.append(word)
+            labels.append(label)
+        rf.close()
+        return lines
+
 def write_tokens(tokens, output_dir, mode):
     """
-    将序列解析结果写入到文件中
-    只在mode=test的时候启用
+    将序列解析结果写入到文件中 - (en) Write sequence parsing results to a file
+    只在mode=test的时候启用 - (en) Only enabled when mode = test
     :param tokens:
     :param mode:
     :return:
@@ -178,7 +196,7 @@ def write_tokens(tokens, output_dir, mode):
         path = os.path.join(output_dir, "token_" + mode + ".txt")
         wf = codecs.open(path, 'a', encoding='utf-8')
         for token in tokens:
-            if token != "**NULL**":
+            if token != "[PAD]":
                 wf.write(token + '\n')
         wf.close()
 
@@ -186,6 +204,7 @@ def write_tokens(tokens, output_dir, mode):
 def convert_single_example(ex_index, example, label_list, max_seq_length, tokenizer, output_dir, mode):
     """
     将一个样本进行分析，然后将字转化为id, 标签转化为id,然后结构化到InputFeatures对象中
+    Analyze a sample, then convert words to ids, tags to ids, and structure into InputFeatures objects
     :param ex_index: index
     :param example: 一个样本
     :param label_list: 标签列表
@@ -196,6 +215,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     :return:
     """
     label_map = {}
+    #here start with zero this means that "[PAD]" is zero
     # 1表示从1开始对label进行index化
     for (i, label) in enumerate(label_list, 1):
         label_map[label] = i
@@ -209,7 +229,8 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     tokens = []
     labels = []
     for i, word in enumerate(textlist):
-        # 分词，如果是中文，就是分字,但是对于一些不在BERT的vocab.txt中得字符会被进行WordPice处理（例如中文的引号），可以将所有的分字操作替换为list(input)
+        # 分词，如果是中文，就是分字,但是对于一些不在BERT的vocab.txt中得字符会被进行WordPiece处理（例如中文的引号），可以将所有的分字操作替换为list(input)
+        # Word break, if it is Chinese, it is word break, but for some characters that are not in BERT's vocab.txt will be processed by WordPiece (such as Chinese quotation marks), you can replace all word break operations with list (input)
         token = tokenizer.tokenize(word)
         tokens.extend(token)
         label_1 = labellist[i]
@@ -221,23 +242,25 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     # tokens = tokenizer.tokenize(example.text)
     # 序列截断
     if len(tokens) >= max_seq_length - 1:
-        tokens = tokens[0:(max_seq_length - 2)]  # -2 的原因是因为序列需要加一个句首和句尾标志
-        labels = labels[0:(max_seq_length - 2)]
+        tokens = tokens[0:(max_seq_length - 1)]  # The reason for # -2 is because the sequence needs to add a sentence beginning and ending flag -2 的原因是因为序列需要加一个句首和句尾标志
+        labels = labels[0:(max_seq_length - 1)]
     ntokens = []
     segment_ids = []
     label_ids = []
     ntokens.append("[CLS]")  # 句子开始设置CLS 标志
     segment_ids.append(0)
     # append("O") or append("[CLS]") not sure!
-    label_ids.append(label_map["[CLS]"])  # O OR CLS 没有任何影响，不过我觉得O 会减少标签个数,不过拒收和句尾使用不同的标志来标注，使用LCS 也没毛病
+    label_ids.append(label_map["[CLS]"])  # O OR CLS 没有任何影响，不过我觉得O 会减少标签个数,不过拒收和句尾使用不同的标志来标注，使用LCS 也没毛病 - (en) O OR CLS has no effect, but I think O will reduce the number of labels, but rejection and end of sentence are marked with different marks, and LCS is not wrong
     for i, token in enumerate(tokens):
         ntokens.append(token)
         segment_ids.append(0)
         label_ids.append(label_map[labels[i]])
-    ntokens.append("[SEP]")  # 句尾添加[SEP] 标志
-    segment_ids.append(0)
-    # append("O") or append("[SEP]") not sure!
-    label_ids.append(label_map["[SEP]"])
+
+    #ntokens.append("[SEP]")  # 句尾添加[SEP] 标志 Add [SEP] flag at the end of the sentence 
+    #segment_ids.append(0)
+    ## append("O") or append("[SEP]") not sure!
+    #label_ids.append(label_map["[SEP]"])
+
     input_ids = tokenizer.convert_tokens_to_ids(ntokens)  # 将序列中的字(ntokens)转化为ID形式
     input_mask = [1] * len(input_ids)
     # label_mask = [1] * len(input_ids)
@@ -248,26 +271,28 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
         segment_ids.append(0)
         # we don't concerned about it!
         label_ids.append(0)
-        ntokens.append("**NULL**")
+        ntokens.append("[PAD]") #ntokens.append("**NULL**")
         # label_mask.append(0)
     # print(len(input_ids))
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
     assert len(label_ids) == max_seq_length
+    assert len(ntokens) == max_seq_length # added by isv (2020/02/17)
     # assert len(label_mask) == max_seq_length
 
     # 打印部分样本数据信息
+    # print some examples
     if ex_index < 5:
-        logger.info("*** Example ***")
-        logger.info("guid: %s" % (example.guid))
-        logger.info("tokens: %s" % " ".join(
+        tf.logging.info("*** Example ***")
+        tf.logging.info("guid: %s" % (example.guid))
+        tf.logging.info("tokens: %s" % " ".join(
             [tokenization.printable_text(x) for x in tokens]))
-        logger.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        logger.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        logger.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        logger.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
-        # logger.info("label_mask: %s" % " ".join([str(x) for x in label_mask]))
+        tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
+        tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
+        tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
+        tf.logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
+        # tf.logging.info("label_mask: %s" % " ".join([str(x) for x in label_mask]))
 
     # 结构化为一个类
     feature = InputFeatures(
@@ -279,13 +304,14 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     )
     # mode='test'的时候才有效
     write_tokens(ntokens, output_dir, mode)
-    return feature
-
+    return feature,ntokens,label_ids
+    #return feature
 
 def filed_based_convert_examples_to_features(
         examples, label_list, max_seq_length, tokenizer, output_file, output_dir, mode=None):
     """
     将数据转化为TF_Record 结构，作为模型数据输入
+    Transform the data into a TF_Record structure and use it as model data input
     :param examples:  样本
     :param label_list:标签list
     :param max_seq_length: 预先设定的最大序列长度
@@ -295,12 +321,14 @@ def filed_based_convert_examples_to_features(
     :return:
     """
     writer = tf.python_io.TFRecordWriter(output_file)
-    # 遍历训练数据
+    batch_tokens = []
+    batch_labels = []
+    # 遍历训练数据 - (en) traverse training data
     for (ex_index, example) in enumerate(examples):
         if ex_index % 5000 == 0:
-            logger.info("Writing example %d of %d" % (ex_index, len(examples)))
+            tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
         # 对于每一个训练样本,
-        feature = convert_single_example(ex_index, example, label_list, max_seq_length, tokenizer, output_dir, mode)
+        feature,ntokens,label_ids = convert_single_example(ex_index, example, label_list, max_seq_length, tokenizer, output_dir, mode)
 
         def create_int_feature(values):
             f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -316,6 +344,9 @@ def filed_based_convert_examples_to_features(
         tf_example = tf.train.Example(features=tf.train.Features(feature=features))
         writer.write(tf_example.SerializeToString())
 
+    # sentence token in each batch
+    #writer.close()
+    #return batch_tokens,batch_labels
 
 def file_based_input_fn_builder(input_file, seq_length, is_training, drop_remainder):
     name_to_features = {
@@ -368,9 +399,9 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
     """
 
     def model_fn(features, labels, mode, params):
-        logger.info("*** Features ***")
+        tf.logging.info("*** Features ***")
         for name in sorted(features.keys()):
-            logger.info("  name = %s, shape = %s" % (name, features[name].shape))
+            tf.logging.info("  name = %s, shape = %s" % (name, features[name].shape))
         input_ids = features["input_ids"]
         input_mask = features["input_mask"]
         segment_ids = features["segment_ids"]
@@ -381,6 +412,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
         # 使用参数构建模型,input_idx 就是输入的样本idx表示，label_ids 就是标签的idx表示
+        # Build the model, input_idx is the sample idx representation of the input, and label_ids is the idx representation of the label
         total_loss, logits, trans, pred_ids = create_model(
             bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
             num_labels, False, args.dropout_rate, args.lstm_size, args.cell, args.num_layers)
@@ -423,12 +455,22 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
         elif mode == tf.estimator.ModeKeys.EVAL:
             # 针对NER ,进行了修改
-            def metric_fn(label_ids, pred_ids):
+            # Modified for NER
+            def metric_fn_orig(label_ids, pred_ids):
                 return {
                     "eval_loss": tf.metrics.mean_squared_error(labels=label_ids, predictions=pred_ids),
                 }
 
-            eval_metrics = metric_fn(label_ids, pred_ids)
+            def metric_fn_test(label_ids, logits,num_labels,mask):
+                predictions = tf.math.argmax(logits, axis=-1, output_type=tf.int32)
+                cm = metrics.streaming_confusion_matrix(label_ids, predictions, num_labels-1, weights=mask)
+                return {
+                    "confusion_matrix":cm,
+                    "eval_loss": tf.metrics.mean_squared_error(labels=label_ids, predictions=pred_ids),
+                }
+            
+            eval_metrics = metric_fn_orig(label_ids, pred_ids)
+            #eval_metrics = metric_fn_test(label_ids, logits, num_labels, input_mask)
             output_spec = tf.estimator.EstimatorSpec(
                 mode=mode,
                 loss=total_loss,
@@ -452,7 +494,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
 def get_last_checkpoint(model_path):
     if not os.path.exists(os.path.join(model_path, 'checkpoint')):
-        logger.info('checkpoint file not exits:'.format(os.path.join(model_path, 'checkpoint')))
+        tf.logging.info('checkpoint file not exits:'.format(os.path.join(model_path, 'checkpoint')))
         return None
     last = None
     with codecs.open(os.path.join(model_path, 'checkpoint'), 'r', encoding='utf-8') as fd:
@@ -469,6 +511,7 @@ def get_last_checkpoint(model_path):
 def adam_filter(model_path):
     """
     去掉模型中的Adam相关参数，这些参数在测试的时候是没有用的
+    Remove Adam related parameters in the model, these parameters are useless when testing
     :param model_path: 
     :return: 
     """
@@ -501,6 +544,7 @@ def train(args):
             (args.max_seq_length, bert_config.max_position_embeddings))
 
     # 在re train 的时候，才删除上一轮产出的文件，在predicted 的时候不做clean
+    # Clean files produced in the previous round retrain, no cleaning when predicting
     if args.clean and args.do_train:
         if os.path.exists(args.output_dir):
             def del_file(path):
@@ -555,21 +599,23 @@ def train(args):
             raise AttributeError('training data is so small...')
         num_warmup_steps = int(num_train_steps * args.warmup_proportion)
 
-        logger.info("***** Running training *****")
-        logger.info("  Num examples = %d", len(train_examples))
-        logger.info("  Batch size = %d", args.batch_size)
-        logger.info("  Num steps = %d", num_train_steps)
+        tf.logging.info("***** Running training *****")
+        tf.logging.info("  Num examples = %d", len(train_examples))
+        tf.logging.info("  Batch size = %d", args.batch_size)
+        tf.logging.info("  Num steps = %d", num_train_steps)
 
         eval_examples = processor.get_dev_examples(args.data_dir)
 
         # 打印验证集数据信息
-        logger.info("***** Running evaluation *****")
-        logger.info("  Num examples = %d", len(eval_examples))
-        logger.info("  Batch size = %d", args.batch_size)
+        tf.logging.info("***** Running evaluation *****")
+        tf.logging.info("  Num examples = %d", len(eval_examples))
+        tf.logging.info("  Batch size = %d", args.batch_size)
 
     label_list = processor.get_labels()
     # 返回的model_dn 是一个函数，其定义了模型，训练，评测方法，并且使用钩子参数，加载了BERT模型的参数进行了自己模型的参数初始化过程
+    # The returned model_dn is a function that defines the model, training, and evaluation methods, and uses hook parameters, loads the parameters of the BERT model, and performs the parameter initialization process of its own model.
     # tf 新的架构方法，通过定义model_fn 函数，定义模型，然后通过EstimatorAPI进行模型的其他工作，Es就可以控制模型的训练，预测，评估工作等。
+    # tf new architecture method. By defining the model_fn function, defining the model, and then performing other work on the model through the EstimatorAPI, Es can control the training, prediction, and evaluation of the model.
     model_fn = model_fn_builder(
         bert_config=bert_config,
         num_labels=len(label_list) + 1,
@@ -589,13 +635,12 @@ def train(args):
         config=run_config)
 
     if args.do_train and args.do_eval:
-        # 1. 将数据转化为tf_record 数据
+        # 1. 将数据转化为tf_record 数据 - (en) 1. Converting data to tf_record data
         train_file = os.path.join(args.output_dir, "train.tf_record")
         if not os.path.exists(train_file):
             filed_based_convert_examples_to_features(
                 train_examples, label_list, args.max_seq_length, tokenizer, train_file, args.output_dir)
-
-        # 2.读取record 数据，组成batch
+        # 2.读取record 数据，组成batch - (en) 2. Read record data to form a batch
         train_input_fn = file_based_input_fn_builder(
             input_file=train_file,
             seq_length=args.max_seq_length,
@@ -614,9 +659,9 @@ def train(args):
             is_training=False,
             drop_remainder=False)
 
-        # train and eval togither
+        # train and eval together
         # early stop hook
-        early_stopping_hook = tf.contrib.estimator.stop_if_no_decrease_hook(
+        early_stopping_hook =  tf.estimator.experimental.stop_if_no_decrease_hook(
             estimator=estimator,
             metric_name='loss',
             max_steps_without_decrease=num_train_steps,
@@ -645,9 +690,9 @@ def train(args):
                                                  args.max_seq_length, tokenizer,
                                                  predict_file, args.output_dir, mode="test")
 
-        logger.info("***** Running prediction*****")
-        logger.info("  Num examples = %d", len(predict_examples))
-        logger.info("  Batch size = %d", args.batch_size)
+        tf.logging.info("***** Running prediction*****")
+        tf.logging.info("  Num examples = %d", len(predict_examples))
+        tf.logging.info("  Batch size = %d", args.batch_size)
 
         predict_drop_remainder = False
         predict_input_fn = file_based_input_fn_builder(
@@ -667,8 +712,8 @@ def train(args):
                 label_token = str(predict_line.label).split(' ')
                 len_seq = len(label_token)
                 if len(line_token) != len(label_token):
-                    logger.info(predict_line.text)
-                    logger.info(predict_line.label)
+                    tf.logging.info(predict_line.text)
+                    tf.logging.info(predict_line.label)
                     break
                 for id in prediction:
                     if idx >= len_seq:
@@ -681,9 +726,9 @@ def train(args):
                     try:
                         line += line_token[idx] + ' ' + label_token[idx] + ' ' + curr_labels + '\n'
                     except Exception as e:
-                        logger.info(e)
-                        logger.info(predict_line.text)
-                        logger.info(predict_line.label)
+                        tf.logging.info(e)
+                        tf.logging.info(predict_line.text)
+                        tf.logging.info(predict_line.label)
                         line = ''
                         break
                     idx += 1

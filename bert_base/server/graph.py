@@ -259,8 +259,9 @@ def optimize_ner_model(args, num_labels,  logger=None):
     :return:
     """
     if not logger:
-        logger = set_logger(colored('NER_MODEL, Lodding...', 'cyan'), args.verbose)
+        logger = set_logger(colored('NER_MODEL, Loading...', 'cyan'), args.verbose)
     try:
+        logger.info("trying to open pb_file...")
         # 如果PB文件已经存在则，返回PB文件的路径，否则将模型转化为PB文件，并且返回存储PB文件的路径
         if args.model_pb_dir is None:
             # 获取当前的运行路径
@@ -272,7 +273,10 @@ def optimize_ner_model(args, num_labels,  logger=None):
         pb_file = os.path.join(tmp_file, 'ner_model.pb')
         if os.path.exists(pb_file):
             print('pb_file exits', pb_file)
+            logger.info('pb_file exits {}\n'.format(pb_file))
             return pb_file
+        else:
+            logger.info('pb_file not present!! ')
 
         import tensorflow as tf
 
@@ -286,12 +290,13 @@ def optimize_ner_model(args, num_labels,  logger=None):
                 from bert_base.train.models import create_model
                 (total_loss, logits, trans, pred_ids) = create_model(
                     bert_config=bert_config, is_training=False, input_ids=input_ids, input_mask=input_mask, segment_ids=None,
-                    labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0, lstm_size=args.lstm_size)
+                    labels=None, num_labels=num_labels, use_one_hot_embeddings=False, dropout_rate=1.0)
                 pred_ids = tf.identity(pred_ids, 'pred_ids')
                 saver = tf.train.Saver()
 
             with tf.Session() as sess:
                 sess.run(tf.global_variables_initializer())
+                logger.info('restoring saved model... {}'.format(args.model_dir) )
                 saver.restore(sess, tf.train.latest_checkpoint(args.model_dir))
                 logger.info('freeze...')
                 from tensorflow.python.framework import graph_util
@@ -339,11 +344,8 @@ def optimize_class_model(args, num_labels,  logger=None):
 
                 bert_config = modeling.BertConfig.from_json_file(os.path.join(args.bert_model_dir, 'bert_config.json'))
                 from bert_base.train.models import create_classification_model
-                #为了兼容多输入，增加segment_id特征，即训练代码中的input_type_ids特征。
-                #loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config, is_training=False,
-                    #input_ids=input_ids, input_mask=input_mask, segment_ids=None, labels=None, num_labels=num_labels)
-                segment_ids = tf.placeholder(tf.int32, (None, args.max_seq_len), 'segment_ids')
-                loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config, is_training=False, input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids, labels=None, num_labels=num_labels)
+                loss, per_example_loss, logits, probabilities = create_classification_model(bert_config=bert_config, is_training=False,
+                    input_ids=input_ids, input_mask=input_mask, segment_ids=None, labels=None, num_labels=num_labels)
                 # pred_ids = tf.argmax(probabilities, axis=-1, output_type=tf.int32, name='pred_ids')
                 # pred_ids = tf.identity(pred_ids, 'pred_ids')
                 probabilities = tf.identity(probabilities, 'pred_prob')

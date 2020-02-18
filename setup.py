@@ -12,14 +12,14 @@ from setuptools import setup, find_packages
 # __version__ = version_line.split('=')[1].replace(' ', '')
 # print(__version__)
 setup(
-    name='bert_base',
-    version='0.0.9',
-    description='Use Google\'s BERT for Chinese natural language processing tasks such as named entity recognition and provide server services',
-    url='https://github.com/macanv/BERT-BiLSTM-CRF-NER',
+    name='bert_as_server',
+    version='1.0.0',
+    description='BERT finetuned models as server for tagging. NERC and text classification. Forked from https://github.com/macanv/BERT-BiLSTM-CRF-NER NER uses BiLSTM-CRF',
+    url='https://github.com/elhuyar/BERT-BiLSTM-CRF-NER',
     long_description=open('README.md', 'r', encoding='utf-8').read(),
     long_description_content_type='text/markdown',
-    author='Ma Can',
-    author_email='ma_cancan@163.com',
+    author='Elhuyar',
+    author_email='i.sanvicente@elhuyar.eus',
     license='MIT',
     packages=find_packages(),
     zip_safe=False,
