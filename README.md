@@ -1,13 +1,9 @@
-# BERT-BiLSTM-CRF-NER
+# BERT finetuned models as server for tagging. NERC and text classification. Forked from  https://github.com/macanv/BERT-BiLSTM-CRF-NER NER uses BiLSTM-CRF 
+
+Tensorflow code for Chinese named entity recognition pre-trained on BLSTM-CRF model using Google's BERT model 
+
 Tensorflow solution of NER task Using BiLSTM-CRF model with Google BERT Fine-tuning
 
-使用谷歌的BERT模型在BLSTM-CRF模型上进行预训练用于中文命名实体识别的Tensorflow代码'
-
-中文文档请查看https://blog.csdn.net/macanv/article/details/85684284  如果对您有帮助，麻烦点个star,谢谢~~  
-
-Welcome to star this repository!
-
-The Chinese training data($PATH/NERdata/) come from:https://github.com/zjy-ucas/ChineseNER 
   
 The CoNLL-2003 data($PATH/NERdata/ori/) come from:https://github.com/kyzhouhzau/BERT-NER 
   
@@ -15,15 +11,14 @@ The evaluation codes come from:https://github.com/guillaumegenthial/tf_metrics/b
 
 
 Try to implement NER work based on google's BERT code and BiLSTM-CRF network!
-This project may be more close to process Chinese data. but other language only need Modify a small amount of code.
+
+The original code from @macanv is for Chinese. The code in this repository was modified to work with Basque and Spanish, and it is closer to https://github.com/macanv/BERT-BiLSTM-CRF-NER
+
 
 THIS PROJECT ONLY SUPPORT Python3.  
 ###################################################################
 ## Download project and install  
 You can install this project by:  
-```
-pip install bert-base==0.0.9 -i https://pypi.python.org/simple
-```
 
 OR
 ```angular2html
@@ -34,14 +29,6 @@ python3 setup.py install
 
 if you do not want to install, you just need clone this project and reference the file of <run.py> to train the model or start the service. 
 
-## UPDATE:
-- 2020.2.6 add simple flask ner service code
-- 2019.2.25 Fix some bug for ner service
-- 2019.2.19: add text classification service
--  fix Missing loss error
-- add label_list params in train process, so you can using -label_list xxx to special labels in training process.  
-  
-    
 ## Train model:
 You can use -help to view the relevant parameters of the training named entity recognition model, where data_dir, bert_config_file, output_dir, init_checkpoint, vocab_file must be specified.
 ```angular2html
@@ -91,17 +78,17 @@ you can special labels using -label_list params, the project get labels from tra
 # using , split
 -labels 'B-LOC, I-LOC ...'
 OR save label in a file like labels.txt, one line one label
--labels labels.txt
+-label_list labels.txt
 ```    
 
 After training model, the NER model will be saved in {output_dir} which you special above cmd line.  
-##### My Training environment：Tesla P40 24G mem  
 
-## As Service
+##### Training environment：GeForce RTX 2080 Ti 12GB RAM  
+
+## Serving fine tuned models for sequence labeling / text classification
 Many server and client code comes from excellent open source projects: [bert as service of hanxiao](https://github.com/hanxiao/bert-as-service) If my code violates any license agreement, please let me know and I will correct it the first time.
-~~and NER server/client service code can be applied to other tasks with simple modifications, such as text categorization, which I will provide later.~~
-this project private Named Entity Recognition and Text Classification server service.
-Welcome to submit your request or share your model, if you want to share it on Github or my work.  
+
+this project provides Named Entity Recognition and Text Classification as server services.
 
 You can use -help to view the relevant parameters of the NER as Service:
 which model_dir, bert_model_dir is need
@@ -133,9 +120,6 @@ mode: If mode is NER/CLASS, then the service identified by the Named Entity Reco
 bert_model_dir: bert_model_dir is a BERT model, you can download from https://github.com/google-research/bert
 ner_model_dir: your ner model checkpoint dir
 model_pb_dir: model freeze save dir, after run optimize func, there will contains like ner_model.pb binary file  
->You can download my ner model from：https://pan.baidu.com/s/1m9VcueQ5gF-TJc00sFD88w, ex_code: guqq
-> Or text classification model from: https://pan.baidu.com/s/1oFPsOUh1n5AM2HjDIo2XCw, ex_code: bbu8   
-Set ner_mode.pb/classification_model.pb to model_pb_dir, and set other file to model_dir(Different models need to be stored separately, you can set ner models label_list.pkl and label2id.pkl to model_dir/ner/ and set text classification file to model_dir/text_classification) , Text classification model can classify 12 categories of Chinese data： '游戏', '娱乐', '财经', '时政', '股票', '教育', '社会', '体育', '家居', '时尚', '房产', '彩票'  
 
 You can see below service starting info:
 ![](./pictures/service_1.png)
@@ -177,10 +161,10 @@ with BertClient(show_server_config=False, check_version=False, check_length=Fals
 you can see this after run the above code:
 ![](./pictures/text_class_rst.png)
 
-Note that it can not start NER service and Text Classification service together. but you can using twice command line start ner service and text classification with different port.  
+Note that NER service and Text Classification service can not be started together. You need to start two instances in different ports.
 
 ### Flask server service
-sometimes, multi thread deep learning model service may not use C/S service, you can useing simple http service replace that, like using flask.
+Sometimes, multi thread deep learning model service may not use C/S service, you can use simple http service replace that, like using flask.
 now you can reference code:bert_base/server/simple_flask_http_service.py，building your simple http server service
 
 ## License
@@ -217,19 +201,6 @@ mkdir output
                   --num_train_epochs=3.0   \
                   --output_dir=./output/result_dir/ 
  ```       
- ##### OR replace the BERT path and project path in bert_lstm_ner.py
- ```
- if os.name == 'nt': #windows path config
-    bert_path = '{your BERT model path}'
-    root_path = '{project path}'
-else: # linux path config
-    bert_path = '{your BERT model path}'
-    root_path = '{project path}'
- ```
- Than Run:
- ```angular2html
-python3 bert_lstm_ner.py
-```
 
 ### USING BLSTM-CRF OR ONLY CRF FOR DECODE!
 Just alter bert_lstm_ner.py line of 450, the params of the function of add_blstm_crf_layer: crf_only=True or False  
@@ -259,7 +230,7 @@ all params using default
 #### In test data set
 ![](./pictures/picture2.png)
 
-#### entity leval result:
+#### entity eval result:
 last two result are label level result, the entitly level result in code of line 796-798,this result will be output in predict process.
 show my entity level result :
 ![](./pictures/03E18A6A9C16082CF22A9E8837F7E35F.png)
@@ -274,25 +245,6 @@ python3 terminal_predict.py
 ```
 ![](./pictures/predict.png)
  
- ## Using NER as Service
-
-#### Service 
-Using NER as Service is simple, you just need to run the python script below in the project root path:
-```angular2html
-python3 runs.py \ 
-    -mode NER
-    -bert_model_dir /home/macan/ml/data/chinese_L-12_H-768_A-12 \
-    -ner_model_dir /home/macan/ml/data/bert_ner \
-    -model_pd_dir /home/macan/ml/workspace/BERT_Base/output/predict_optimizer \
-    -num_worker 8
-```
-
-  
-You can download my ner model from：https://pan.baidu.com/s/1m9VcueQ5gF-TJc00sFD88w, ex_code: guqq  
-Set ner_mode.pb to model_pd_dir, and set other file to ner_model_dir and than run last cmd  
-![](./pictures/service_1.png)
-![](./pictures/service_2.png)
-
 
 #### Client
 The client using methods can reference client_test.py script
@@ -308,19 +260,22 @@ with BertClient( ner_model_dir=ner_model_dir, show_server_config=False, check_ve
     print('rst:', rst)
     print(time.perf_counter() - start_t)
 ```
+
 NOTE: input format you can sometime reference bert as service project.    
-Welcome to provide more client language code like java or others.  
- ## Using yourself data to train
- if you want to use yourself data to train ner model,you just modify  the get_labes func.
+
+## Using your own data to train
+If you want to use your own data to train a NER model (BERT finetuning), There are two options:
+1. Modify the get_labels func.
  ```angular2html
 def get_labels(self):
         return ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]"]
 ```
-NOTE: "X", “[CLS]”, “[SEP]” These three are necessary, you just replace your data label to this return list.  
-Or you can use last code lets the program automatically get the label from training data
+NOTE: "[PAD]", "X", "[CLS]", and "[SEP]" are necessary for BERT, add them to your label list. 
+
+2. The existing get_labels function gets labels from training data. BE AWARE that if training data does not contain all posible labels, errors may arise.
+
 ```angular2html
-def get_labels(self):
-        # 通过读取train文件获取标签的方法会出现一定的风险。
+def get_labels(self):        
         if os.path.exists(os.path.join(FLAGS.output_dir, 'label_list.pkl')):
             with codecs.open(os.path.join(FLAGS.output_dir, 'label_list.pkl'), 'rb') as rf:
                 self.labels = pickle.load(rf)
@@ -336,7 +291,19 @@ def get_labels(self):
 ```
 
 
-## NEW UPDATE
+## UPDATES (from https://github.com/macanv/BERT-BiLSTM-CRF-NER)
+
+
+2020.2.6 add simple flask ner service code
+
+2019.2.25 Fix some bug for ner service
+
+2019.2.19: add text classification service
+
+2019.2: fix Missing loss error
+
+2019.2: Add label_list params in train process, so you can using -label_list xxx to special labels in training process.
+
 2019.1.30 Support pip install and command line control  
 
 2019.1.30 Add Service/Client for NER process  
@@ -347,7 +314,7 @@ def get_labels(self):
 
 
 
-## reference: 
+## References: 
 + The evaluation codes come from:https://github.com/guillaumegenthial/tf_metrics/blob/master/tf_metrics/__init__.py
 
 + [https://github.com/google-research/bert](https://github.com/google-research/bert)
