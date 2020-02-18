@@ -291,7 +291,15 @@ def get_labels(self):
 ```
 
 
-## UPDATES (from https://github.com/macanv/BERT-BiLSTM-CRF-NER)
+## UPDATES
+
+2020.2.18 Several modifications: 
+     - NER Server is not returning only the encoded sentence but also the tokenized string (so the client can get the taggerd string).    
+     - [PAD] tag is used for padding tokens as in https://github.com/kyzhouhzau/BERT-NER
+     - Chinese comments partially translated to English
+
+
+## OLD UPDATES (from https://github.com/macanv/BERT-BiLSTM-CRF-NER)
 
 
 2020.2.6 add simple flask ner service code
