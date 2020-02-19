@@ -18,6 +18,7 @@ import numpy as np
 import tensorflow as tf
 import codecs
 import pickle
+import csv
 
 from bert_base.train import tf_metrics
 from bert_base.bert import modeling
@@ -32,7 +33,7 @@ __version__ = '0.1.0'
 
 __all__ = ['__version__', 'DataProcessor', 'NerProcessor', 'write_tokens', 'convert_single_example',
            'filed_based_convert_examples_to_features', 'file_based_input_fn_builder',
-           'model_fn_builder', 'train']
+           'model_fn_builder',  'import_tf', 'train']
 
 
 
@@ -85,13 +86,11 @@ class NerProcessor(DataProcessor):
 
     def get_train_examples(self, data_dir):
         return self._create_example(
-            self._read_data(os.path.join(data_dir, "train.txt")), "train"
-        )
+            self._read_data(os.path.join(data_dir, "train.txt")), "train")
 
     def get_dev_examples(self, data_dir):
         return self._create_example(
-            self._read_data(os.path.join(data_dir, "dev.txt")), "dev"
-        )
+            self._read_data(os.path.join(data_dir, "dev.txt")), "dev")
 
     def get_test_examples(self, data_dir):
         return self._create_example(
@@ -100,18 +99,19 @@ class NerProcessor(DataProcessor):
     def get_labels(self, labels=None):
         if labels is not None:
             try:
-                # 支持从文件中读取标签类型
+                # Labels from file - 支持从文件中读取标签类型
                 if os.path.exists(labels) and os.path.isfile(labels):
                     with codecs.open(labels, 'r', encoding='utf-8') as fd:
                         for line in fd:
                             self.labels.append(line.strip())
                 else:
-                    # 否则通过传入的参数，按照逗号分割
+                    # Labels from command line, comma separated - 否则通过传入的参数，按照逗号分割
                     self.labels = labels.split(',')
                 self.labels = set(self.labels) # to set
             except Exception as e:
                 print(e)
-        # 通过读取train文件获取标签的方法会出现一定的风险。
+        # Labels from train BEWARE!: If a label is not present in train errors will arise.
+        # 通过读取train文件获取标签的方法会出现一定的风险。- The method of obtaining tags by reading the train file will bring some risks.
         if os.path.exists(os.path.join(self.output_dir, 'label_list.pkl')):
             with codecs.open(os.path.join(self.output_dir, 'label_list.pkl'), 'rb') as rf:
                 self.labels = pickle.load(rf)
@@ -121,7 +121,7 @@ class NerProcessor(DataProcessor):
                 with codecs.open(os.path.join(self.output_dir, 'label_list.pkl'), 'wb') as rf:
                     pickle.dump(self.labels, rf)
             else:
-                self.labels = ["O", 'B-TIM', 'I-TIM', "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]","[PAD]"]
+                self.labels = ["[PAD]","O", 'B-MISC', 'I-MISC', "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]"]
         return self.labels
 
     def _create_example(self, lines, set_type):
@@ -142,13 +142,13 @@ class NerProcessor(DataProcessor):
             words = []
             labels = []
             for line in f:
-                contends = line.strip()
-                tokens = contends.split(' ')
+                contents = line.strip()
+                tokens = contents.split(' ')
                 if len(tokens) == 2:
                     words.append(tokens[0])
                     labels.append(tokens[-1])
                 else:
-                    if len(contends) == 0 and len(words) > 0:
+                    if len(contents) == 0 and len(words) > 0:
                         label = []
                         word = []
                         for l, w in zip(labels, words):
@@ -160,7 +160,7 @@ class NerProcessor(DataProcessor):
                         words = []
                         labels = []
                         continue
-                if contends.startswith("-DOCSTART-"):
+                if contents.startswith("-DOCSTART-"):
                     continue
             return lines
 
@@ -184,6 +184,56 @@ class NerProcessor(DataProcessor):
         rf.close()
         return lines
 
+
+
+class ClassProcessor(DataProcessor):
+    """Processor for tabulated text classification data sets :
+    label<tab>sentence format."""
+
+    def get_train_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_data(os.path.join(data_dir, "train.txt")), "train")
+
+    def get_dev_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_data(os.path.join(data_dir, "dev.txt")), "dev")
+
+    def get_test_examples(self, data_dir):
+        """See base class."""
+        return self._create_examples(
+            self._read_data(os.path.join(data_dir, "test.txt")), "test")
+
+    def get_labels(self):
+        """See base class."""
+        return ["P", "N", "NEU"]
+        #return ["pos", "neg", "neu"]
+        #return ["Ekonomia","Euskal_Herria","Euskara","Gizartea","Historia","Ingurumena","Iritzia","Komunikazioa","Kultura","Nazioartea","Politika","Zientzia"]
+        #return ["alarm/cancel_alarm","alarm/modify_alarm","alarm/set_alarm","alarm/show_alarms","alarm/snooze_alarm","alarm/time_left_on_alarm","reminder/cancel_reminder", "reminder/set_reminder", "reminder/show_reminders","weather/checkSunrise","weather/checkSunset","weather/find"]
+  
+    def _create_examples(self, lines, set_type):
+        """Creates examples for the training and dev sets."""
+        examples = []
+        for (i, line) in enumerate(lines):
+      
+            guid = "%s-%s" % (set_type, i)
+            text_a = tokenization.convert_to_unicode(line[1])
+            label = tokenization.convert_to_unicode(line[0])
+            examples.append(
+                InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
+        return examples
+
+    def _read_data(self, input_file, quotechar=None):
+        """Reads a tab separated value file."""
+        with tf.gfile.Open(input_file, "r") as f:
+            reader = csv.reader(f, delimiter="\t", quotechar=quotechar)
+            lines = []
+            for line in reader:
+                lines.append(line)
+        return lines
+
+    
 def write_tokens(tokens, output_dir, mode):
     """
     将序列解析结果写入到文件中 - (en) Write sequence parsing results to a file
@@ -215,9 +265,11 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     :return:
     """
     label_map = {}
+    # 1表示从1开始对label进行index化 -(en) 1 means index the label from 1 
+    # Original code start from 1, but uses no label for padding. In contrast, https://github.com/kyzhouhzau/BERT-NER/ uses [PAD] and starts from 0. We follow that inplementation now 
+    #for (i, label) in enumerate(label_list,1):
     #here start with zero this means that "[PAD]" is zero
-    # 1表示从1开始对label进行index化
-    for (i, label) in enumerate(label_list, 1):
+    for (i, label) in enumerate(label_list):
         label_map[label] = i
     # 保存label->index 的map
     if not os.path.exists(os.path.join(output_dir, 'label2id.pkl')):
@@ -241,8 +293,10 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
                 labels.append("X")
     # tokens = tokenizer.tokenize(example.text)
     # 序列截断
+    # only Account for [CLS] with "- 1".
     if len(tokens) >= max_seq_length - 1:
-        tokens = tokens[0:(max_seq_length - 1)]  # The reason for # -2 is because the sequence needs to add a sentence beginning and ending flag -2 的原因是因为序列需要加一个句首和句尾标志
+        # The reason for -2 is because the sequence needs to add a sentence beginning and ending flag -2  - 的原因是因为序列需要加一个句首和句尾标志 - NOT ANYMORE
+        tokens = tokens[0:(max_seq_length - 1)]  
         labels = labels[0:(max_seq_length - 1)]
     ntokens = []
     segment_ids = []
@@ -250,7 +304,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length, tokeni
     ntokens.append("[CLS]")  # 句子开始设置CLS 标志
     segment_ids.append(0)
     # append("O") or append("[CLS]") not sure!
-    label_ids.append(label_map["[CLS]"])  # O OR CLS 没有任何影响，不过我觉得O 会减少标签个数,不过拒收和句尾使用不同的标志来标注，使用LCS 也没毛病 - (en) O OR CLS has no effect, but I think O will reduce the number of labels, but rejection and end of sentence are marked with different marks, and LCS is not wrong
+    label_ids.append(label_map["[CLS]"])  # O OR CLS 没有任何影响，不过我觉得O 会减少标签个数,不过拒收和句尾使用不同的标志来标注，使用LCS 也没毛病 - (en) O OR CLS has no effect. I think O will reduce the number of labels, but rejection and end of sentence are marked with different marks, and CLS is not wrong
     for i, token in enumerate(tokens):
         ntokens.append(token)
         segment_ids.append(0)
@@ -329,7 +383,8 @@ def filed_based_convert_examples_to_features(
             tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
         # 对于每一个训练样本,
         feature,ntokens,label_ids = convert_single_example(ex_index, example, label_list, max_seq_length, tokenizer, output_dir, mode)
-
+        batch_tokens.extend(ntokens)
+        batch_labels.extend(label_ids)
         def create_int_feature(values):
             f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
             return f
@@ -344,9 +399,9 @@ def filed_based_convert_examples_to_features(
         tf_example = tf.train.Example(features=tf.train.Features(feature=features))
         writer.write(tf_example.SerializeToString())
 
-    # sentence token in each batch
-    #writer.close()
-    #return batch_tokens,batch_labels
+    #sentence token in each batch
+    writer.close()
+    return batch_tokens,batch_labels
 
 def file_based_input_fn_builder(input_file, seq_length, is_training, drop_remainder):
     name_to_features = {
@@ -426,15 +481,15 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
         # 打印变量名
-        # logger.info("**** Trainable Variables ****")
+        tf.logging.info("**** Trainable Variables ****")
         #
         # # 打印加载模型的参数
-        # for var in tvars:
-        #     init_string = ""
-        #     if var.name in initialized_variable_names:
-        #         init_string = ", *INIT_FROM_CKPT*"
-        #     logger.info("  name = %s, shape = %s%s", var.name, var.shape,
-        #                     init_string)
+        for var in tvars:
+            init_string = ""
+            if var.name in initialized_variable_names:
+                init_string = ", *INIT_FROM_CKPT*"
+            tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
+                        init_string)
 
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
@@ -529,11 +584,76 @@ def adam_filter(model_path):
     saver.save(sess, os.path.join(model_path, 'model.ckpt'))
 
 
+
+def _write_base(batch_tokens,id2label,prediction,batch_labels,wf,i):
+    token = batch_tokens[i]
+    predict="ERROR"
+    if prediction in id2label:
+        predict = id2label[prediction]
+    true_l = id2label[batch_labels[i]]
+    tf.logging.info("{} {} {}".format(token,true_l,predict))
+    if token!="[PAD]" and token!="[CLS]" and true_l!="X":
+        #
+        if predict=="X" and not predict.startswith("##"):
+            predict="O"
+        line = "{} {} {}\n".format(token,true_l,predict)
+        wf.write(line)
+
+def _write_base_predict(batch_tokens,id2label,prediction,batch_labels,wf,i):
+    token = batch_tokens[i]
+    predict="ERROR"
+    if prediction in id2label:
+        predict = id2label[prediction]
+    true_l = id2label[batch_labels[i]]
+    if token!="[PAD]": # and token!="[CLS]" and true_l!="X":
+        #
+        if predict=="X" and not predict.startswith("##"):
+            predict="O"
+        line = "{} {} {}\n".format(token,true_l,predict)
+
+        if token == "[CLS]":
+            line = "\n"
+            
+        wf.write(line)
+
+
+        
+def Writer(output_predict_file,result,batch_tokens,batch_labels,id2label,crf=True):
+    with open(output_predict_file,'w') as wf:
+
+        if crf:
+            predictions  = []
+            for m,pred in enumerate(result):
+                predictions.extend(pred)
+            for i,prediction in enumerate(predictions):
+                _write_base(batch_tokens,id2label,prediction,batch_labels,wf,i)
+                #_write_base_predict(batch_tokens,id2label,prediction,batch_labels,wf,i)
+                
+        else:
+            for i,prediction in enumerate(result):
+                #_write_base(batch_tokens,id2label,prediction,batch_labels,wf,i)
+                _write_base_predict(batch_tokens,id2label,prediction,batch_labels,wf,i)
+       
+
+
+
+
+    
+def set_os_variables(device_id='-1', verbose=False):#, use_fp16=False):
+    os.environ['CUDA_VISIBLE_DEVICES'] = '-1' if int(device_id) < 0 else device_id
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' if verbose else '3'
+    #os.environ['TF_FP16_MATMUL_USE_FP32_COMPUTE'] = '0' if use_fp16 else '1'
+    #os.environ['TF_FP16_CONV_USE_FP32_COMPUTE'] = '0' if use_fp16 else '1'
+    #import tensorflow as tf
+    tf.logging.set_verbosity(tf.logging.DEBUG if verbose else tf.logging.ERROR)    
+
 def train(args):
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device_map
-
+    set_os_variables(args.device_map, args.verbose)
+            
     processors = {
-        "ner": NerProcessor
+        "ner": NerProcessor,
+        "class": ClassProcessor
     }
     bert_config = modeling.BertConfig.from_json_file(args.bert_config_file)
 
@@ -612,6 +732,7 @@ def train(args):
         tf.logging.info("  Batch size = %d", args.batch_size)
 
     label_list = processor.get_labels()
+    tf.logging.info("** LABEL_LIST: {}".format(label_list))
     # 返回的model_dn 是一个函数，其定义了模型，训练，评测方法，并且使用钩子参数，加载了BERT模型的参数进行了自己模型的参数初始化过程
     # The returned model_dn is a function that defines the model, training, and evaluation methods, and uses hook parameters, loads the parameters of the BERT model, and performs the parameter initialization process of its own model.
     # tf 新的架构方法，通过定义model_fn 函数，定义模型，然后通过EstimatorAPI进行模型的其他工作，Es就可以控制模型的训练，预测，评估工作等。
@@ -638,7 +759,7 @@ def train(args):
         # 1. 将数据转化为tf_record 数据 - (en) 1. Converting data to tf_record data
         train_file = os.path.join(args.output_dir, "train.tf_record")
         if not os.path.exists(train_file):
-            filed_based_convert_examples_to_features(
+            _,_ = filed_based_convert_examples_to_features(
                 train_examples, label_list, args.max_seq_length, tokenizer, train_file, args.output_dir)
         # 2.读取record 数据，组成batch - (en) 2. Read record data to form a batch
         train_input_fn = file_based_input_fn_builder(
@@ -650,7 +771,7 @@ def train(args):
 
         eval_file = os.path.join(args.output_dir, "eval.tf_record")
         if not os.path.exists(eval_file):
-            filed_based_convert_examples_to_features(
+            batch_tokens,batch_labels = filed_based_convert_examples_to_features(
                 eval_examples, label_list, args.max_seq_length, tokenizer, eval_file, args.output_dir)
 
         eval_input_fn = file_based_input_fn_builder(
@@ -683,10 +804,10 @@ def train(args):
         with codecs.open(os.path.join(args.output_dir, 'label2id.pkl'), 'rb') as rf:
             label2id = pickle.load(rf)
             id2label = {value: key for key, value in label2id.items()}
-
+            tf.logging.info("****** id2label ****** \n {}\n".format(id2label))
         predict_examples = processor.get_test_examples(args.data_dir)
         predict_file = os.path.join(args.output_dir, "predict.tf_record")
-        filed_based_convert_examples_to_features(predict_examples, label_list,
+        batch_tokens,batch_labels = filed_based_convert_examples_to_features(predict_examples, label_list,
                                                  args.max_seq_length, tokenizer,
                                                  predict_file, args.output_dir, mode="test")
 
@@ -703,7 +824,9 @@ def train(args):
 
         result = estimator.predict(input_fn=predict_input_fn)
         output_predict_file = os.path.join(args.output_dir, "label_test.txt")
-
+        Writer(output_predict_file,result,batch_tokens,batch_labels,id2label)
+        
+        """
         def result_to_pair(writer):
             for predict_line, prediction in zip(predict_examples, result):
                 idx = 0
@@ -733,9 +856,10 @@ def train(args):
                         break
                     idx += 1
                 writer.write(line + '\n')
-
+        
         with codecs.open(output_predict_file, 'w', encoding='utf-8') as writer:
             result_to_pair(writer)
+        """
         from bert_base.train import conlleval
         eval_result = conlleval.return_report(output_predict_file)
         print(''.join(eval_result))

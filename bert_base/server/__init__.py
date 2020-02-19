@@ -6,7 +6,7 @@
 # @Author  : MaCan (ma_cancan@163.com)
 # @File    : server.py
 
-some code copy from <https://hanxiao.github.io>
+some code copied from <https://hanxiao.github.io>
 """
 
 from __future__ import absolute_import
