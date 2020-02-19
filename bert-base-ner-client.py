@@ -1,5 +1,5 @@
 import time
-from bert_base.client import BertClient
+from bert_as_server.client import BertClient
 
 
 def bert2conll(tokens, labels):

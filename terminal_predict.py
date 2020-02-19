@@ -12,9 +12,9 @@ import pickle
 import os
 from datetime import datetime
 
-from bert_base.train.models import create_model, InputFeatures
-from bert_base.bert import tokenization, modeling
-from bert_base.train.train_helper import get_args_parser
+from bert_as_server.train.models import create_model, InputFeatures
+from bert_as_server.bert import tokenization, modeling
+from bert_as_server.train.train_helper import get_args_parser
 args = get_args_parser()
 
 model_dir = r'C:\Users\C\Documents\Tencent Files\389631699\FileRecv\semi_corpus_people_2014'

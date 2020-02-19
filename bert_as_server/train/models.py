@@ -7,7 +7,7 @@
  @File    : models.py
 """
 
-from bert_base.train.lstm_crf_layer import BLSTM_CRF
+from bert_as_server.train.lstm_crf_layer import BLSTM_CRF
 from tensorflow.contrib.layers.python.layers import initializers
 
 
@@ -79,7 +79,7 @@ def create_model(bert_config, is_training, input_ids, input_mask,
     """
     # 使用数据加载BertModel,获取对应的字embedding
     import tensorflow as tf
-    from bert_base.bert import modeling
+    from bert_as_server.bert import modeling
     model = modeling.BertModel(
         config=bert_config,
         is_training=is_training,
@@ -116,7 +116,7 @@ def create_classification_model(bert_config, is_training, input_ids, input_mask,
     :return:
     """
     import tensorflow as tf
-    from bert_base.bert import modeling
+    from bert_as_server.bert import modeling
     # 通过传入的训练数据，进行representation
     model = modeling.BertModel(
         config=bert_config,

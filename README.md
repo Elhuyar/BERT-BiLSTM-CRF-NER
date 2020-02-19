@@ -130,7 +130,7 @@ you can using below code test client:
 #### 1. NER Client
 ```angular2html
 import time
-from bert_base.client import BertClient
+from bert_as_server.client import BertClient
 
 with BertClient(show_server_config=False, check_version=False, check_length=False, mode='NER') as bc:
     start_t = time.perf_counter()
@@ -165,7 +165,7 @@ Note that NER service and Text Classification service can not be started togethe
 
 ### Flask server service
 Sometimes, multi thread deep learning model service may not use C/S service, you can use simple http service replace that, like using flask.
-now you can reference code:bert_base/server/simple_flask_http_service.py，building your simple http server service
+now you can reference code:bert_as_server/server/simple_flask_http_service.py，building your simple http server service
 
 ## License
 MIT.  

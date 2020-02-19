@@ -42,8 +42,8 @@ setup(
         #'Topic :: Scientific/Engineering :: Artificial Intelligence :: Natural Language Processing :: Named Entity Recognition',
     ),
     entry_points={
-        'console_scripts': ['bert-base-serving-start=bert_base.runs:start_server',
-                            'bert-base-ner-train=bert_base.runs:train_ner'],
+        'console_scripts': ['bert-base-serving-start=bert_as_server.runs:start_server',
+                            'bert-base-ner-train=bert_as_server.runs:train_ner'],
     },
     keywords='bert nlp ner NER named entity recognition bilstm crf tensorflow machine learning sentence encoding embedding serving',
 )

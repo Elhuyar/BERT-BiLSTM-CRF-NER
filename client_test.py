@@ -7,7 +7,7 @@
  @File    : client_test.py
 """
 import time
-from bert_base.client import BertClient
+from bert_as_server.client import BertClient
 
 
 def ner_test():

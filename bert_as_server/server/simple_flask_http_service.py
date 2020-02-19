@@ -23,8 +23,8 @@ import numpy as np
 
 import sys
 sys.path.append('../..')
-from bert_base.train.models import create_model, InputFeatures
-from bert_base.bert import tokenization, modeling
+from bert_as_server.train.models import create_model, InputFeatures
+from bert_as_server.bert import tokenization, modeling
 
 
 model_dir = r'../../output'

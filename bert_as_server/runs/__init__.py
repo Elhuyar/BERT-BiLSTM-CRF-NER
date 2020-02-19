@@ -9,8 +9,8 @@
 
 
 def start_server():
-    from bert_base.server import BertServer
-    from bert_base.server.helper import get_run_args
+    from bert_as_server.server import BertServer
+    from bert_as_server.server.helper import get_run_args
 
     args = get_run_args()
     # print(args)
@@ -25,8 +25,8 @@ def start_client():
 
 def train_ner():
     import os
-    from bert_base.train.train_helper import get_args_parser
-    from bert_base.train.bert_lstm_ner import train
+    from bert_as_server.train.train_helper import get_args_parser
+    from bert_as_server.train.bert_lstm_ner import train
 
     args = get_args_parser()
     if True:

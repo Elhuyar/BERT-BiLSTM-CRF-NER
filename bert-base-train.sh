@@ -5,7 +5,7 @@ export BERT_BASE_DIR=/mnt/nfs/baliabideLexikalak/wordEmbedings/eu/$1
 export GLUE_DIR=/home/inaki/datuak/$3
 export EPOCHS=4
 export RESULT_OUTPUT_DIR_BASE="bert-base-output-e"$EPOCHS
-for i in 1 2 3 4 5
+for i in 3 #1 2 3 4 5
 do
     echo "*********************   TRAIN FOR RUN $i ***********************************************"
     bert-base-ner-train \

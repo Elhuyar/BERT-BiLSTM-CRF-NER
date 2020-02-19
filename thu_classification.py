@@ -18,10 +18,10 @@ import tensorflow as tf
 
 import sys
 # sys.path.append('..')
-# from bert_base.server.helper import get_logger
-from bert_base.bert import modeling
-from bert_base.bert import optimization
-from bert_base.bert import tokenization
+# from bert_as_server.server.helper import get_logger
+from bert_as_server.bert import modeling
+from bert_as_server.bert import optimization
+from bert_as_server.bert import tokenization
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 

@@ -20,14 +20,14 @@ import codecs
 import pickle
 import csv
 
-from bert_base.train import tf_metrics
-from bert_base.bert import modeling
-from bert_base.bert import optimization
-from bert_base.bert import tokenization
+from bert_as_server.train import tf_metrics
+from bert_as_server.bert import modeling
+from bert_as_server.bert import optimization
+from bert_as_server.bert import tokenization
 
 # import
 
-from bert_base.train.models import create_model, InputFeatures, InputExample
+from bert_as_server.train.models import create_model, InputFeatures, InputExample
 
 __version__ = '0.1.0'
 
@@ -97,6 +97,11 @@ class NerProcessor(DataProcessor):
             self._read_data(os.path.join(data_dir, "test.txt")), "test")
 
     def get_labels(self, labels=None):
+        self.labels = ["[PAD]","O", 'B-MISC', 'I-MISC', "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "X", "[CLS]", "[SEP]"]
+        return self.labels
+    
+    def get_labels_orig(self, labels=None):
+        #def get_labels(self, labels=None):
         if labels is not None:
             try:
                 # Labels from file - 支持从文件中读取标签类型
@@ -154,7 +159,7 @@ class NerProcessor(DataProcessor):
                         for l, w in zip(labels, words):
                             if len(l) > 0 and len(w) > 0:
                                 label.append(l)
-                                self.labels.add(l)
+                                #self.labels.add(l)
                                 word.append(w)
                         lines.append([' '.join(label), ' '.join(word)])
                         words = []
@@ -739,7 +744,7 @@ def train(args):
     # tf new architecture method. By defining the model_fn function, defining the model, and then performing other work on the model through the EstimatorAPI, Es can control the training, prediction, and evaluation of the model.
     model_fn = model_fn_builder(
         bert_config=bert_config,
-        num_labels=len(label_list) + 1,
+        num_labels=len(label_list),# + 1,
         init_checkpoint=args.init_checkpoint,
         learning_rate=args.learning_rate,
         num_train_steps=num_train_steps,
@@ -860,7 +865,7 @@ def train(args):
         with codecs.open(output_predict_file, 'w', encoding='utf-8') as writer:
             result_to_pair(writer)
         """
-        from bert_base.train import conlleval
+        from bert_as_server.train import conlleval
         eval_result = conlleval.return_report(output_predict_file)
         print(''.join(eval_result))
         # 写结果到文件中

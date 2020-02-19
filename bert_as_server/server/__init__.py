@@ -35,7 +35,7 @@ from .helper import *
 from .http import BertHTTPProxy
 from .zmq_decor import multi_socket
 sys.path.append('..')
-from bert_base.train.models import convert_id_to_label
+from bert_as_server.train.models import convert_id_to_label
 
 __all__ = ['__version__', 'BertServer']
 __version__ = '1.7.8'
@@ -525,8 +525,8 @@ class BertWorker(Process):
     def input_fn_builder(self, socks, tf):
         import sys
         sys.path.append('..')
-        from bert_base.bert.extract_features import convert_lst_to_features
-        from bert_base.bert.tokenization import FullTokenizer
+        from bert_as_server.bert.extract_features import convert_lst_to_features
+        from bert_as_server.bert.tokenization import FullTokenizer
 
         def gen():
             tokenizer = FullTokenizer(vocab_file=os.path.join(self.args.bert_model_dir, 'vocab.txt'))
