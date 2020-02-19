@@ -3,3 +3,8 @@ __pycache__/
 
 #emacs backup files
 *~
+
+# python builds
+*.egg-info/
+build/
+dist/
